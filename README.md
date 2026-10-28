@@ -195,8 +195,11 @@ werden vor dem Start mit Datei und Zeilennummer gemeldet – der Server startet 
 
 ```bash
 dotnet build
-dotnet test
+dotnet test tests/AutoOpcUaServer.Tests
+dotnet test tests/AutoOpcUaServer.Gui.Tests
 ```
+
+Die Testprojekte sind bewusst nicht in der `AutoOpcUaServer.sln` enthalten und werden einzeln aufgerufen.
 
 Projektstruktur:
 

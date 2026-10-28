@@ -13,4 +13,6 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: dotnet build --configuration Release
-      - run: dotnet test --configuration Release --no-build
+      # The test projects are not part of the solution, so they are run individually.
+      - run: dotnet test tests/AutoOpcUaServer.Tests --configuration Release
+      - run: dotnet test tests/AutoOpcUaServer.Gui.Tests --configuration Release
