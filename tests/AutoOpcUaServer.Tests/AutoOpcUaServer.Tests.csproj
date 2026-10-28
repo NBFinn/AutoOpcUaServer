@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AutoOpcUaServer\AutoOpcUaServer.csproj" />
+    <ProjectReference Include="..\..\src\AutoOpcUaServer.Core\AutoOpcUaServer.Core.csproj" />
   </ItemGroup>
 
 </Project>

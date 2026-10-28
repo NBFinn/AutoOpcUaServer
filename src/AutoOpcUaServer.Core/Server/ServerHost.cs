@@ -12,14 +12,21 @@ public sealed class ServerHost : IAsyncDisposable
     private readonly ITelemetryContext _telemetry;
     private ApplicationInstance? _application;
 
-    public ServerHost(ServerOptions options)
+    /// <param name="options">Server settings.</param>
+    /// <param name="configureLogging">
+    /// Where the OPC UA stack writes its warnings and errors. Defaults to the console.
+    /// </param>
+    public ServerHost(ServerOptions options, Action<ILoggingBuilder>? configureLogging = null)
     {
         _options = options;
 
-        // The OPC UA stack only reports problems; normal operation is logged by this application.
-        _telemetry = DefaultTelemetry.Create(builder => builder
-            .AddSimpleConsole(o => o.SingleLine = true)
-            .SetMinimumLevel(LogLevel.Warning));
+        // The OPC UA stack only reports problems; normal operation is logged by the application.
+        configureLogging ??= builder => builder.AddSimpleConsole(o => o.SingleLine = true);
+        _telemetry = DefaultTelemetry.Create(builder =>
+        {
+            configureLogging(builder);
+            builder.SetMinimumLevel(LogLevel.Warning);
+        });
     }
 
     public TagServer? Server { get; private set; }

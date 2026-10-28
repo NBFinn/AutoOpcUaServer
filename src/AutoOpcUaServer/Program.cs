@@ -56,6 +56,14 @@ catch (Exception ex)
     return 3;
 }
 
+var nodeManager = host.Server!.TagNodeManager!;
+nodeManager.Error += message => Console.Error.WriteLine($"Error: {message}");
+if (options.LogWrites)
+{
+    nodeManager.ValueWritten += (nodeId, value) =>
+        Console.WriteLine($"{DateTime.Now:HH:mm:ss} write {nodeId} = {ValueFormatter.Format(value)}");
+}
+
 Console.WriteLine($"Server '{options.ApplicationName}' is running. Endpoints:");
 foreach (var endpoint in host.EndpointUrls)
 {

@@ -15,6 +15,7 @@ public sealed class TagNodeManager : CustomNodeManager2
     private readonly IReadOnlyList<TagDefinition> _tags;
     private readonly ServerOptions _options;
     private readonly List<(BaseDataVariableState Variable, Simulator Simulator)> _simulated = [];
+    private readonly Dictionary<string, (BaseDataVariableState Variable, TagDefinition Tag)> _variables = new(StringComparer.Ordinal);
     private readonly Stopwatch _clock = new();
     private Timer? _simulationTimer;
 
@@ -27,7 +28,56 @@ public sealed class TagNodeManager : CustomNodeManager2
     }
 
     /// <summary>Number of variables created in the address space.</summary>
-    public int VariableCount { get; private set; }
+    public int VariableCount => _variables.Count;
+
+    /// <summary>Raised when an OPC UA client writes a value (NodeId string, new value).</summary>
+    public event Action<string, object?>? ValueWritten;
+
+    /// <summary>Raised for problems that occur while the server is running.</summary>
+    public event Action<string>? Error;
+
+    /// <summary>Returns the current value of every variable.</summary>
+    public IReadOnlyList<TagValue> ReadValues()
+    {
+        lock (Lock)
+        {
+            return _variables
+                .Select(v => new TagValue(v.Key, v.Value.Variable.Value, v.Value.Variable.Timestamp))
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Sets a variable from text, as if it had been written by a client. Returns an error message
+    /// if the node does not exist or the text does not match the data type.
+    /// </summary>
+    public string? SetValue(string nodeId, string? text)
+    {
+        if (!_variables.TryGetValue(nodeId, out var entry))
+        {
+            return $"Unknown node '{nodeId}'.";
+        }
+
+        object value;
+        try
+        {
+            value = ValueConverter.Convert(text, entry.Tag.DataType, entry.Tag.IsArray);
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException)
+        {
+            return $"'{text}' is not a valid {entry.Tag.DataType}{(entry.Tag.IsArray ? "[]" : "")}.";
+        }
+
+        lock (Lock)
+        {
+            entry.Variable.Value = value;
+            entry.Variable.Timestamp = DateTime.UtcNow;
+            entry.Variable.StatusCode = StatusCodes.Good;
+            entry.Variable.ClearChangeMasks(SystemContext, false);
+        }
+
+        return null;
+    }
 
     public override NodeId New(ISystemContext context, NodeState node) => node.NodeId;
 
@@ -81,7 +131,7 @@ public sealed class TagNodeManager : CustomNodeManager2
                     _simulated.Add((variable, new Simulator(tag)));
                 }
 
-                VariableCount++;
+                _variables[variable.NodeId.Identifier.ToString()!] = (variable, tag);
             }
 
             foreach (var node in topLevel)
@@ -166,7 +216,7 @@ public sealed class TagNodeManager : CustomNodeManager2
             variable.ArrayDimensions = new ReadOnlyList<uint>(new List<uint> { 0 });
         }
 
-        if (_options.LogWrites && tag.Access == TagAccess.ReadWrite)
+        if (tag.Access == TagAccess.ReadWrite)
         {
             variable.OnSimpleWriteValue = OnWriteValue;
         }
@@ -177,10 +227,7 @@ public sealed class TagNodeManager : CustomNodeManager2
 
     private ServiceResult OnWriteValue(ISystemContext context, NodeState node, ref object value)
     {
-        var text = value is Array array
-            ? "[" + string.Join(", ", array.Cast<object>()) + "]"
-            : Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
-        Console.WriteLine($"{DateTime.Now:HH:mm:ss} write {node.NodeId} = {text}");
+        ValueWritten?.Invoke(node.NodeId.Identifier.ToString()!, value);
         return ServiceResult.Good;
     }
 
@@ -203,7 +250,7 @@ public sealed class TagNodeManager : CustomNodeManager2
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Simulation error: {ex.Message}");
+            Error?.Invoke($"Simulation error: {ex.Message}");
         }
     }
 
@@ -225,3 +272,6 @@ public sealed class TagNodeManager : CustomNodeManager2
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
 }
+
+/// <summary>Current value of a variable, identified by its string NodeId.</summary>
+public sealed record TagValue(string NodeId, object? Value, DateTime Timestamp);

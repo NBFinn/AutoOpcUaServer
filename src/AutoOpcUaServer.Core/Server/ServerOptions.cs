@@ -49,6 +49,7 @@ public sealed class ServerOptions
 
     public string PkiDirectory { get; set; } = "pki";
 
+    /// <summary>Whether the console application prints values written by clients.</summary>
     public bool LogWrites { get; set; } = true;
 
     public bool ValidateOnly { get; set; }

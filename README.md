@@ -3,13 +3,41 @@
 Ein OPC UA Server in C# (.NET 8), der seinen Adressraum automatisch aus **CSV-, Excel- oder JSON-Dateien** aufbaut.
 Tagliste importieren, Server starten, mit UaExpert (oder einem anderen Client) verbinden – fertig.
 
+Es gibt zwei Varianten: eine **grafische Oberfläche** (Windows, Linux, macOS) und eine **Kommandozeilen-Version** (z. B. für Skripte, Docker oder als Dienst).
+
+![Grafische Oberfläche](docs/screenshot.png)
+
 Typische Einsätze: Simulation einer SPS/Anlage für Tests, Entwicklung von OPC UA Clients, Demo- und Schulungsumgebungen.
 
 Basierend auf dem offiziellen [OPC Foundation UA .NET Standard Stack](https://github.com/OPCFoundation/UA-.NETStandard).
 
-## Schnellstart
+## Grafische Oberfläche
 
 Voraussetzung: [.NET 8 SDK](https://dotnet.microsoft.com/download)
+
+```bash
+dotnet run --project src/AutoOpcUaServer.Gui
+```
+
+1. **Dateien hinzufügen…** / **Ordner hinzufügen…** – oder CSV-, Excel- und JSON-Dateien einfach ins Fenster ziehen.
+   Die Tags erscheinen sofort in der Tabelle; Fehler in den Dateien stehen unter **Meldungen** (mit Datei und Zeile).
+2. Links Port, Name, Sicherheit und optional Benutzer/Passwort einstellen.
+3. **▶ Server starten** – die Endpoint-URL erscheint oben rechts und lässt sich kopieren.
+4. Während der Server läuft, zeigt die Tabelle die **Live-Werte** (inkl. Simulation und Schreibzugriffen von Clients).
+   Einen Tag auswählen, um seinen Wert unten **manuell zu setzen** – auch bei Read-only-Tags, z. B. um eine SPS zu simulieren.
+5. Schreibzugriffe von Clients und Warnungen des OPC-UA-Stacks werden unter **Meldungen** protokolliert.
+
+Dateiliste und Einstellungen (außer dem Passwort) werden gespeichert und beim nächsten Start wiederhergestellt
+(`%APPDATA%\AutoOpcUaServer` bzw. `~/.config/AutoOpcUaServer`). Dort liegen auch die Zertifikate der GUI (`pki/`).
+Dateien können auch beim Start übergeben werden: `AutoOpcUaServer.Gui.exe tags.xlsx`.
+
+Als eigenständige Anwendung (ohne installiertes .NET):
+
+```bash
+dotnet publish src/AutoOpcUaServer.Gui -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish-gui
+```
+
+## Kommandozeile
 
 ```bash
 dotnet run --project src/AutoOpcUaServer -- samples
@@ -29,7 +57,7 @@ Press Ctrl+C to stop.
 
 Danach im Client `opc.tcp://localhost:4840` verbinden. Die Tags liegen unter `Objects`.
 
-### Als eigenständige Anwendung bauen
+### Kommandozeilen-Version als eigenständige Anwendung bauen
 
 ```bash
 dotnet publish src/AutoOpcUaServer -c Release -r win-x64 --self-contained -o publish
@@ -173,11 +201,19 @@ dotnet test
 Projektstruktur:
 
 ```
-src/AutoOpcUaServer/
-  Program.cs, CommandLine.cs    Einstiegspunkt und Argumente
+src/AutoOpcUaServer.Core/       Gemeinsame Bibliothek
   Model/                        Tag-Definition, Datentypen, Wertkonvertierung
   Import/                       CSV-, Excel-, JSON-Importer und Validierung
   Server/                       OPC UA Server, NodeManager, Simulation, Konfiguration
+src/AutoOpcUaServer/            Kommandozeilen-Version
+src/AutoOpcUaServer.Gui/        Grafische Oberfläche (Avalonia, MVVM)
 tests/AutoOpcUaServer.Tests/    Unit-Tests und Integrationstests (echter Client ↔ Server)
+tests/AutoOpcUaServer.Gui.Tests/ Headless-Tests der Oberfläche
 samples/                        Beispiel-Taglisten
+```
+
+Screenshot für die README neu erzeugen:
+
+```bash
+GUI_SCREENSHOT=$PWD/docs/screenshot.png dotnet test tests/AutoOpcUaServer.Gui.Tests --filter Main_window_renders
 ```

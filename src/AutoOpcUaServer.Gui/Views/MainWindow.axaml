@@ -1,0 +1,171 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AutoOpcUaServer.Gui.ViewModels"
+        x:Class="AutoOpcUaServer.Gui.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="AutoOpcUaServer"
+        Width="1280" Height="780" MinWidth="960" MinHeight="580"
+        WindowStartupLocation="CenterScreen"
+        DragDrop.AllowDrop="True">
+
+  <DockPanel>
+
+    <!-- Toolbar -->
+    <Border DockPanel.Dock="Top" Padding="12,10"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Dateien hinzufügen…" Command="{Binding AddFilesCommand}" IsEnabled="{Binding IsStopped}" />
+          <Button Content="Ordner hinzufügen…" Command="{Binding AddFolderCommand}" IsEnabled="{Binding IsStopped}" />
+          <Button Content="Neu laden" Command="{Binding ReloadCommand}" />
+          <Rectangle Width="1" Margin="4,2" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+          <Button Classes="accent" Content="▶  Server starten" Command="{Binding StartCommand}" />
+          <Button Content="■  Stoppen" Command="{Binding StopCommand}" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Ellipse Classes="status" Classes.running="{Binding IsRunning}" Classes.error="{Binding HasErrors}" />
+          <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <TextBox Text="{Binding EndpointUrl}" IsReadOnly="True" IsVisible="{Binding IsRunning}" MinWidth="260" />
+          <Button Content="Kopieren" Command="{Binding CopyEndpointCommand}" IsVisible="{Binding IsRunning}" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Padding="12,4"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,0,0">
+      <TextBlock Text="{Binding Summary}" FontSize="12" />
+    </Border>
+
+    <Grid ColumnDefinitions="340,Auto,*">
+
+      <!-- Left: files and settings -->
+      <ScrollViewer Grid.Column="0">
+        <StackPanel Margin="12" Spacing="10">
+
+          <TextBlock Classes="section" Text="Importdateien" />
+          <Border Classes="card" Padding="4">
+            <Panel>
+              <ListBox ItemsSource="{Binding Files}" MinHeight="90" MaxHeight="220" Background="Transparent">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <DockPanel>
+                      <Button DockPanel.Dock="Right" Content="✕" Padding="6,0" FontSize="11"
+                              ToolTip.Tip="Entfernen"
+                              IsEnabled="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsStopped}"
+                              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveFileCommand}"
+                              CommandParameter="{Binding}" />
+                      <TextBlock Text="{Binding}" ToolTip.Tip="{Binding}" TextTrimming="LeadingCharacterEllipsis"
+                                 VerticalAlignment="Center" FontSize="12" />
+                    </DockPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBlock Classes="hint" Text="Noch keine Dateien.&#10;CSV-, Excel- oder JSON-Dateien hierher ziehen oder über „Dateien hinzufügen…“ auswählen."
+                         IsVisible="{Binding !Files.Count}" Margin="10" TextAlignment="Center" VerticalAlignment="Center" />
+            </Panel>
+          </Border>
+
+          <TextBlock Classes="section" Text="Server" />
+          <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8"
+                  IsEnabled="{Binding IsStopped}">
+              <TextBlock Classes="label" Grid.Row="0" Text="Port" />
+              <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1" FormatString="0" />
+              <TextBlock Classes="label" Grid.Row="1" Text="Host" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Host}" />
+              <TextBlock Classes="label" Grid.Row="2" Text="URL-Pfad" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EndpointPath}" Watermark="optional, z. B. MeinServer" />
+              <TextBlock Classes="label" Grid.Row="3" Text="Name" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding ApplicationName}" />
+              <TextBlock Classes="label" Grid.Row="4" Text="Namespace" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NamespaceUri}" />
+              <TextBlock Classes="label" Grid.Row="5" Text="Root-Ordner" />
+              <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding RootFolder}" Watermark="optional" />
+              <TextBlock Classes="label" Grid.Row="6" Text="Intervall (ms)" />
+              <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding SimulationInterval}" Minimum="50" Maximum="3600000" Increment="100" FormatString="0"
+                             ToolTip.Tip="Aktualisierungsintervall der Simulation" />
+            </Grid>
+          </Border>
+
+          <TextBlock Classes="section" Text="Sicherheit" />
+          <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8"
+                  IsEnabled="{Binding IsStopped}">
+              <TextBlock Classes="label" Grid.Row="0" Text="Modus" />
+              <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding SecurityModes}" SelectedItem="{Binding Security}" />
+              <TextBlock Classes="label" Grid.Row="1" Text="Benutzer" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding UserName}" Watermark="leer = anonym" />
+              <TextBlock Classes="label" Grid.Row="2" Text="Passwort" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Password}" PasswordChar="●" />
+              <CheckBox Grid.Row="3" Grid.ColumnSpan="2" Content="Anonym zusätzlich erlauben" IsChecked="{Binding AllowAnonymous}" />
+              <CheckBox Grid.Row="4" Grid.ColumnSpan="2" Content="Client-Zertifikate automatisch vertrauen" IsChecked="{Binding AutoAccept}" />
+            </Grid>
+          </Border>
+          <TextBlock Classes="hint" Text="none = unverschlüsselt, secure = nur signiert/verschlüsselt, all = beides." />
+        </StackPanel>
+      </ScrollViewer>
+
+      <GridSplitter Grid.Column="1" Width="1" ResizeDirection="Columns"
+                    Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+
+      <!-- Right: tags and messages -->
+      <TabControl Grid.Column="2" Margin="8,4,8,8" SelectedIndex="{Binding SelectedTabIndex}">
+        <TabItem Header="{Binding TagsHeader}">
+          <DockPanel Margin="0,8,0,0">
+            <TextBox DockPanel.Dock="Top" Text="{Binding Filter}" Watermark="Filtern nach Pfad, NodeId, Typ oder Beschreibung…" Margin="0,0,0,8" />
+
+            <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,8,0,0" Padding="10,8" IsVisible="{Binding CanEditValue}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,10,0">
+                  <Run Text="Wert setzen:" FontWeight="SemiBold" />
+                  <Run Text="{Binding SelectedTag.NodeId}" />
+                </TextBlock>
+                <Button DockPanel.Dock="Right" Content="Setzen" Classes="accent" Margin="8,0,0,0"
+                        Command="{Binding SetValueCommand}" HotKey="Enter" />
+                <TextBox Text="{Binding EditValue}" Watermark="Neuer Wert (Arrays mit | trennen)" />
+              </DockPanel>
+            </Border>
+
+            <DataGrid ItemsSource="{Binding VisibleTags}" SelectedItem="{Binding SelectedTag}"
+                      IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="True" CanUserSortColumns="True"
+                      GridLinesVisibility="Horizontal" HeadersVisibility="Column">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Pfad" Binding="{Binding Path}" x:DataType="vm:TagRowViewModel" Width="2*" />
+                <DataGridTextColumn Header="Wert" Binding="{Binding Value}" x:DataType="vm:TagRowViewModel" Width="*" FontWeight="SemiBold" />
+                <DataGridTextColumn Header="Typ" Binding="{Binding DataType}" x:DataType="vm:TagRowViewModel" Width="Auto" />
+                <DataGridTextColumn Header="Zugriff" Binding="{Binding Access}" x:DataType="vm:TagRowViewModel" Width="Auto" />
+                <DataGridTextColumn Header="Simulation" Binding="{Binding Simulation}" x:DataType="vm:TagRowViewModel" Width="Auto" />
+                <DataGridTextColumn Header="Zeitstempel" Binding="{Binding Timestamp}" x:DataType="vm:TagRowViewModel" Width="Auto" />
+                <DataGridTextColumn Header="NodeId" Binding="{Binding NodeId}" x:DataType="vm:TagRowViewModel" Width="1.5*" />
+                <DataGridTextColumn Header="Beschreibung" Binding="{Binding Description}" x:DataType="vm:TagRowViewModel" Width="1.5*" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </TabItem>
+
+        <TabItem Header="{Binding LogHeader}">
+          <DockPanel Margin="0,8,0,0">
+            <Button DockPanel.Dock="Top" HorizontalAlignment="Right" Content="Leeren" Command="{Binding ClearLogCommand}" Margin="0,0,0,8" />
+            <ListBox ItemsSource="{Binding Log}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LogEntry">
+                  <Grid ColumnDefinitions="70,80,*">
+                    <TextBlock Text="{Binding TimeText}" FontSize="12" Opacity="0.7" />
+                    <TextBlock Grid.Column="1" Text="{Binding KindText}" FontSize="12"
+                               Classes="log-kind" Classes.error="{Binding IsError}" Classes.warning="{Binding IsWarning}" Classes.write="{Binding IsWrite}" />
+                    <SelectableTextBlock Grid.Column="2" Text="{Binding Message}" FontSize="12" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </TabItem>
+      </TabControl>
+    </Grid>
+  </DockPanel>
+</Window>

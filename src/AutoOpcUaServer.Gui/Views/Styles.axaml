@@ -1,0 +1,63 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style Selector="TextBlock.section">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,4,0,0" />
+  </Style>
+
+  <Style Selector="TextBlock.label">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,12,0" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <Style Selector="TextBlock.hint">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Opacity" Value="0.65" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+
+  <Style Selector="Ellipse.status">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="Fill" Value="#9AA0A6" />
+  </Style>
+  <Style Selector="Ellipse.status.running">
+    <Setter Property="Fill" Value="#2EA043" />
+  </Style>
+  <Style Selector="Ellipse.status.error">
+    <Setter Property="Fill" Value="#D1242F" />
+  </Style>
+
+  <Style Selector="TextBlock.log-kind">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.log-kind.error">
+    <Setter Property="Foreground" Value="#D1242F" />
+  </Style>
+  <Style Selector="TextBlock.log-kind.warning">
+    <Setter Property="Foreground" Value="#BF8700" />
+  </Style>
+  <Style Selector="TextBlock.log-kind.write">
+    <Setter Property="Foreground" Value="#0969DA" />
+  </Style>
+
+  <Style Selector="TabItem">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="MinHeight" Value="36" />
+  </Style>
+
+  <Style Selector="DataGridCell">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+</Styles>
