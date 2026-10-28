@@ -1,0 +1,13 @@
+# Beispiel-Tagliste für AutoOpcUaServer
+# Spalten: Path;DataType;Value;Access;Description;Simulation;Min;Max;Period
+Path;DataType;Value;Access;Description;Simulation;Min;Max;Period
+Plant/Line1/Temperature;Double;21,5;R;Temperatur Linie 1 in °C;Sine;15;30;60
+Plant/Line1/Pressure;Float;1.2;R;Druck in bar;Random;0.8;1.6;
+Plant/Line1/Running;Boolean;true;RW;Linie läuft;;;;
+Plant/Line1/Setpoint;Double;22;RW;Sollwert Temperatur;;;;
+Plant/Line1/PartCounter;Int32;0;R;Gefertigte Teile;Counter;0;100000;
+Plant/Line1/Heartbeat;Boolean;false;R;Lebensbit;Toggle;;;
+Plant/Line2/Speed;UInt16;0;R;Bandgeschwindigkeit;Ramp;0;1200;30
+Plant/Line2/Mode;String;Automatik;RW;Betriebsart;;;;
+Plant/Line2/Recipe;Int32[];1|2|3|4;RW;Rezeptschritte;;;;
+Plant/Info/StartTime;DateTime;2026-01-01T08:00:00Z;R;Startzeitpunkt;;;;

@@ -1,0 +1,8 @@
+{
+  "tags": [
+    { "path": "Robot/Axis1/Position", "dataType": "Double", "value": 0, "access": "R", "simulation": "Sine", "min": -180, "max": 180, "period": 20 },
+    { "path": "Robot/Axis1/Enabled", "dataType": "Boolean", "value": true },
+    { "path": "Robot/Status", "nodeId": "Robot.State", "dataType": "String", "value": "Idle", "description": "Status text" },
+    { "path": "Robot/Offsets", "dataType": "Float[]", "value": [0.5, 1.0, -0.25] }
+  ]
+}
