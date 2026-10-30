@@ -29,6 +29,9 @@ public sealed class GuiSettings
     public bool AutoAcceptUntrustedCertificates { get; set; }
 
     public int SimulationIntervalMs { get; set; } = 1000;
+
+    /// <summary>Nodes created in the GUI, stored with the same columns as the import files.</summary>
+    public List<Dictionary<string, string?>> ManualTags { get; set; } = [];
 }
 
 /// <summary>Loads and saves <see cref="GuiSettings"/> as JSON in the user's application data folder.</summary>
@@ -77,6 +80,7 @@ public sealed class SettingsStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Remembering settings is a convenience; a read-only profile must not break the app.
         }
     }
 }

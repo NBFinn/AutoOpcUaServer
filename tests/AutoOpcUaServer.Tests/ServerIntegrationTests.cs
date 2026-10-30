@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using AutoOpcUaServer.Import;
+using AutoOpcUaServer.Model;
 using AutoOpcUaServer.Server;
 using Opc.Ua;
 using Opc.Ua.Client;
@@ -120,6 +121,44 @@ public sealed class ServerIntegrationTests : IAsyncLifetime
         var children = await browser.BrowseAsync(ExpandedNodeId.ToNodeId(plant.NodeId, Session.NamespaceUris));
 
         Assert.Equal(["Line1", "Mode"], children.Select(c => c.BrowseName.Name).Order());
+    }
+
+    [Fact]
+    public async Task Tags_added_at_runtime_are_browsable_and_readable()
+    {
+        var nodeManager = _host!.Server!.TagNodeManager!;
+
+        Assert.Null(await nodeManager.AddTagAsync(new TagDefinition { Path = "Plant/Line1/Added", DataType = TagDataType.Int32, Value = "7" }));
+        Assert.Null(await nodeManager.AddTagAsync(new TagDefinition { Path = "Extra/Sub/Flag", DataType = TagDataType.Boolean, Value = "true" }));
+        Assert.Null(await nodeManager.AddTagAsync(new TagDefinition { Path = "Solo", DataType = TagDataType.String, Value = "hi" }));
+        Assert.Null(await nodeManager.AddTagAsync(new TagDefinition { Path = "Extra/Counter", DataType = TagDataType.Int16, Simulation = SimulationKind.Counter }));
+
+        Assert.Equal(7, (await Session.ReadValueAsync(Id("Plant.Line1.Added"))).Value);
+        Assert.Equal(true, (await Session.ReadValueAsync(Id("Extra.Sub.Flag"))).Value);
+        Assert.Equal("hi", (await Session.ReadValueAsync(Id("Solo"))).Value);
+
+        var browser = new Browser(Session) { BrowseDirection = BrowseDirection.Forward, ReferenceTypeId = ReferenceTypeIds.HierarchicalReferences };
+        var objects = (await browser.BrowseAsync(ObjectIds.ObjectsFolder)).Select(r => r.BrowseName.Name).ToList();
+        Assert.Contains("Extra", objects);
+        Assert.Contains("Solo", objects);
+
+        var line1 = await browser.BrowseAsync(Id("Plant.Line1"));
+        Assert.Contains(line1, r => r.BrowseName.Name == "Added");
+
+        await Task.Delay(400);
+        Assert.NotEqual((short)0, (await Session.ReadValueAsync(Id("Extra.Counter"))).Value);
+    }
+
+    [Fact]
+    public async Task Conflicting_runtime_tag_is_rejected()
+    {
+        var nodeManager = _host!.Server!.TagNodeManager!;
+
+        var duplicate = await nodeManager.AddTagAsync(new TagDefinition { Path = "Plant/Mode", DataType = TagDataType.String });
+        var folderClash = await nodeManager.AddTagAsync(new TagDefinition { Path = "Plant/Line1", DataType = TagDataType.String });
+
+        Assert.Contains("already defined", duplicate);
+        Assert.Contains("both as a variable and as a folder", folderClash);
     }
 
     [Fact]

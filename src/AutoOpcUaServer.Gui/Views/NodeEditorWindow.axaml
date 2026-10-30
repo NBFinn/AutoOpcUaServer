@@ -1,0 +1,98 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AutoOpcUaServer.Gui.ViewModels"
+        x:Class="AutoOpcUaServer.Gui.Views.NodeEditorWindow"
+        x:DataType="vm:NodeEditorViewModel"
+        Title="{Binding Title}"
+        Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+
+  <DockPanel>
+    <!-- Actions -->
+    <Border DockPanel.Dock="Bottom" Padding="24,16"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="Abbrechen" Command="{Binding CancelCommand}" IsCancel="True" MinWidth="96" />
+        <Button Classes="accent" Content="{Binding SaveText}" Command="{Binding SaveCommand}" IsDefault="True" MinWidth="120" />
+      </StackPanel>
+    </Border>
+
+    <StackPanel Margin="24,20,24,20" Spacing="16">
+      <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
+
+      <!-- Path -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="field" Text="Pfad" />
+        <TextBox x:Name="PathBox" Text="{Binding Path}" Watermark="Anlage/Linie1/Temperatur" />
+        <TextBlock Classes="hint" Text="Ordner mit / trennen – fehlende Ordner werden automatisch angelegt." />
+        <TextBlock Classes="hint" Text="{Binding NodeIdPreview}" FontFamily="{DynamicResource MonospaceFont}" />
+      </StackPanel>
+
+      <!-- Type -->
+      <Grid ColumnDefinitions="*,16,*" RowDefinitions="Auto,Auto">
+        <TextBlock Classes="field" Text="Datentyp" />
+        <ComboBox Grid.Row="1" ItemsSource="{Binding DataTypes}" SelectedItem="{Binding DataType}" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+        <CheckBox Grid.Column="2" Grid.Row="1" Content="Array (mehrere Werte)" IsChecked="{Binding IsArray}" Margin="0,4,0,0" />
+      </Grid>
+
+      <!-- Access -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="field" Text="Zugriff für Clients" />
+        <StackPanel Orientation="Horizontal" Spacing="24">
+          <RadioButton Content="Nur lesen" IsChecked="{Binding !IsWritable}" GroupName="access" />
+          <RadioButton Content="Lesen und schreiben" IsChecked="{Binding IsWritable}" GroupName="access" />
+        </StackPanel>
+      </StackPanel>
+
+      <!-- Value -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="field" Text="Startwert" />
+        <TextBox Text="{Binding Value}" />
+        <TextBlock Classes="hint" Text="{Binding ValueHint}" />
+      </StackPanel>
+
+      <!-- Description -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="field" Text="Beschreibung (optional)" />
+        <TextBox Text="{Binding Description}" />
+      </StackPanel>
+
+      <!-- Simulation -->
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="field" Text="Simulation" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding SimulationKinds}" SelectedItem="{Binding Simulation}" MinWidth="160" />
+          </Grid>
+          <Grid ColumnDefinitions="*,12,*,12,*" RowDefinitions="Auto,Auto" IsVisible="{Binding IsSimulated}">
+            <TextBlock Classes="field" Text="Min" />
+            <TextBox Grid.Row="1" Text="{Binding Min}" Watermark="0" Margin="0,4,0,0" />
+            <TextBlock Grid.Column="2" Classes="field" Text="Max" />
+            <TextBox Grid.Column="2" Grid.Row="1" Text="{Binding Max}" Watermark="100" Margin="0,4,0,0" />
+            <TextBlock Grid.Column="4" Classes="field" Text="Periode (s)" IsVisible="{Binding UsesPeriod}" />
+            <TextBox Grid.Column="4" Grid.Row="1" Text="{Binding Period}" Watermark="60" Margin="0,4,0,0" IsVisible="{Binding UsesPeriod}" />
+          </Grid>
+          <TextBlock Classes="hint" IsVisible="{Binding !IsSimulated}"
+                     Text="Ohne Simulation behält der Node seinen Wert, bis ein Client oder du ihn änderst." />
+        </StackPanel>
+      </Border>
+
+      <!-- Advanced -->
+      <Expander Header="Erweitert" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="field" Text="Eigene NodeId (optional)" />
+          <TextBox Text="{Binding NodeId}" Watermark="leer = aus dem Pfad gebildet" />
+        </StackPanel>
+      </Expander>
+
+      <!-- Validation errors -->
+      <Border Classes="error-box" IsVisible="{Binding HasErrors}">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Node kann so nicht gespeichert werden" FontWeight="SemiBold" />
+          <SelectableTextBlock Text="{Binding ErrorText}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DockPanel>
+</Window>

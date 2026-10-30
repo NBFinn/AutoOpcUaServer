@@ -7,5 +7,10 @@ public interface IUiServices
 
     Task<string?> PickFolderAsync();
 
+    Task<string?> PickSaveFileAsync(string suggestedName);
+
     Task CopyToClipboardAsync(string text);
+
+    /// <summary>Shows the node editor; returns the created or changed tag, or null if cancelled.</summary>
+    Task<Model.TagDefinition?> EditNodeAsync(ViewModels.NodeEditorViewModel editor);
 }

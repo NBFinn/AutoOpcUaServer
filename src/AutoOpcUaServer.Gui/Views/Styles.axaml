@@ -13,6 +13,22 @@
     <Setter Property="FontSize" Value="13" />
   </Style>
 
+  <Style Selector="TextBlock.field">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="Border.error-box">
+    <Setter Property="Background" Value="#FDECEC" />
+    <Setter Property="BorderBrush" Value="#D1242F" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="Border.error-box TextBlock, Border.error-box SelectableTextBlock">
+    <Setter Property="Foreground" Value="#8C1D18" />
+  </Style>
+
   <Style Selector="TextBlock.hint">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Opacity" Value="0.65" />
@@ -46,7 +62,7 @@
     <Setter Property="Foreground" Value="#D1242F" />
   </Style>
   <Style Selector="TextBlock.log-kind.warning">
-    <Setter Property="Foreground" Value="#BF8700" />
+    <Setter Property="Foreground" Value="#9D6E00" />
   </Style>
   <Style Selector="TextBlock.log-kind.write">
     <Setter Property="Foreground" Value="#0969DA" />

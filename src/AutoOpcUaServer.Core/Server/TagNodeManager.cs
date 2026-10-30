@@ -12,7 +12,9 @@ namespace AutoOpcUaServer.Server;
 /// </summary>
 public sealed class TagNodeManager : CustomNodeManager2
 {
-    private readonly IReadOnlyList<TagDefinition> _tags;
+    private readonly List<TagDefinition> _tags;
+    private readonly Dictionary<string, FolderState> _folders = new(StringComparer.Ordinal);
+    private FolderState? _root;
     private readonly ServerOptions _options;
     private readonly List<(BaseDataVariableState Variable, Simulator Simulator)> _simulated = [];
     private readonly Dictionary<string, (BaseDataVariableState Variable, TagDefinition Tag)> _variables = new(StringComparer.Ordinal);
@@ -22,7 +24,7 @@ public sealed class TagNodeManager : CustomNodeManager2
     public TagNodeManager(IServerInternal server, ApplicationConfiguration configuration, IReadOnlyList<TagDefinition> tags, ServerOptions options)
         : base(server, configuration, options.NamespaceUri)
     {
-        _tags = tags;
+        _tags = [.. tags];
         _options = options;
         SystemContext.NodeIdFactory = this;
     }
@@ -91,64 +93,119 @@ public sealed class TagNodeManager : CustomNodeManager2
             }
 
             var topLevel = new List<BaseInstanceState>();
-            FolderState? root = null;
             if (!string.IsNullOrWhiteSpace(_options.RootFolder))
             {
-                root = CreateFolder(null, _options.RootFolder.Trim(), _options.RootFolder.Trim());
-                topLevel.Add(root);
+                _root = CreateFolder(null, _options.RootFolder.Trim(), _options.RootFolder.Trim());
+                topLevel.Add(_root);
             }
 
-            var folders = new Dictionary<string, FolderState>(StringComparer.Ordinal);
             foreach (var tag in _tags)
             {
-                var segments = TagPaths.Split(tag.Path, _options.PathSeparator);
-                NodeState? parent = root;
-                for (var i = 0; i < segments.Length - 1; i++)
+                var (_, firstNewNode) = AddToTree(tag);
+                if (firstNewNode.Parent is null && firstNewNode != _root)
                 {
-                    var folderPath = string.Join(_options.PathSeparator, segments[..(i + 1)]);
-                    if (!folders.TryGetValue(folderPath, out var folder))
-                    {
-                        var nodeId = TagPaths.FolderNodeId(folderPath, _options.PathSeparator);
-                        folder = CreateFolder(parent, nodeId, segments[i]);
-                        folders[folderPath] = folder;
-                        if (parent is null)
-                        {
-                            topLevel.Add(folder);
-                        }
-                    }
-
-                    parent = folder;
+                    topLevel.Add(firstNewNode);
                 }
-
-                var variable = CreateVariable(parent, tag);
-                if (parent is null)
-                {
-                    topLevel.Add(variable);
-                }
-
-                if (tag.Simulation != SimulationKind.None)
-                {
-                    _simulated.Add((variable, new Simulator(tag)));
-                }
-
-                _variables[variable.NodeId.Identifier.ToString()!] = (variable, tag);
             }
 
             foreach (var node in topLevel)
             {
-                node.AddReference(ReferenceTypes.Organizes, true, ObjectIds.ObjectsFolder);
+                PrepareTopLevel(node);
                 objectsReferences.Add(new NodeStateReference(ReferenceTypes.Organizes, false, node.NodeId));
-                if (node is FolderState folder)
-                {
-                    folder.EventNotifier = EventNotifiers.SubscribeToEvents;
-                    AddRootNotifier(folder);
-                }
-
                 AddPredefinedNode(SystemContext, node);
             }
+
+            EnsureSimulationTimer();
+        }
+    }
+
+    /// <summary>
+    /// Adds a variable (and any missing folders) while the server is running. Returns an error
+    /// message if the tag conflicts with the existing address space.
+    /// </summary>
+    public async Task<string?> AddTagAsync(TagDefinition tag, CancellationToken ct = default)
+    {
+        BaseInstanceState firstNewNode;
+        lock (Lock)
+        {
+            var errors = new List<string>();
+            TagValidator.Validate([.. _tags, tag], _options.PathSeparator, errors, new List<string>());
+            if (errors.Count > 0)
+            {
+                return errors[0];
+            }
+
+            _tags.Add(tag);
+            (_, firstNewNode) = AddToTree(tag);
+            if (firstNewNode.Parent is null)
+            {
+                PrepareTopLevel(firstNewNode);
+            }
+
+            AddPredefinedNode(SystemContext, firstNewNode);
+            EnsureSimulationTimer();
         }
 
-        if (_simulated.Count > 0)
+        // New top-level nodes also need the forward reference from the Objects folder, which is
+        // owned by another node manager.
+        if (firstNewNode.Parent is null)
+        {
+            await Server.NodeManager.AddReferencesAsync(
+                ObjectIds.ObjectsFolder,
+                new List<IReference> { new NodeStateReference(ReferenceTypes.Organizes, false, firstNewNode.NodeId) },
+                ct);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Creates the folders of the tag's path that do not exist yet and the variable itself.
+    /// Returns the variable and the topmost node that was newly created (a folder or the variable).
+    /// </summary>
+    private (BaseDataVariableState Variable, BaseInstanceState FirstNewNode) AddToTree(TagDefinition tag)
+    {
+        var segments = TagPaths.Split(tag.Path, _options.PathSeparator);
+        NodeState? parent = _root;
+        BaseInstanceState? firstNewNode = null;
+        for (var i = 0; i < segments.Length - 1; i++)
+        {
+            var folderPath = string.Join(_options.PathSeparator, segments[..(i + 1)]);
+            if (!_folders.TryGetValue(folderPath, out var folder))
+            {
+                folder = CreateFolder(parent, TagPaths.FolderNodeId(folderPath, _options.PathSeparator), segments[i]);
+                _folders[folderPath] = folder;
+                firstNewNode ??= folder;
+            }
+
+            parent = folder;
+        }
+
+        var variable = CreateVariable(parent, tag);
+        firstNewNode ??= variable;
+
+        if (tag.Simulation != SimulationKind.None)
+        {
+            _simulated.Add((variable, new Simulator(tag)));
+        }
+
+        _variables[variable.NodeId.Identifier.ToString()!] = (variable, tag);
+        return (variable, firstNewNode);
+    }
+
+    private void PrepareTopLevel(BaseInstanceState node)
+    {
+        node.AddReference(ReferenceTypes.Organizes, true, ObjectIds.ObjectsFolder);
+        if (node is FolderState folder)
+        {
+            folder.EventNotifier = EventNotifiers.SubscribeToEvents;
+            AddRootNotifier(folder);
+        }
+    }
+
+    private void EnsureSimulationTimer()
+    {
+        if (_simulated.Count > 0 && _simulationTimer is null)
         {
             _clock.Start();
             _simulationTimer = new Timer(_ => Simulate(), null, _options.SimulationIntervalMs, _options.SimulationIntervalMs);

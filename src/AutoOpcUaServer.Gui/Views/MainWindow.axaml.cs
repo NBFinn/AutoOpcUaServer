@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using AutoOpcUaServer.Gui.Services;
 using AutoOpcUaServer.Gui.ViewModels;
+using AutoOpcUaServer.Model;
 
 namespace AutoOpcUaServer.Gui.Views;
 
@@ -20,6 +21,13 @@ public partial class MainWindow : Window, IUiServices
         InitializeComponent();
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
+        TagGrid.DoubleTapped += (_, _) =>
+        {
+            if (ViewModel?.EditNodeCommand.CanExecute(null) == true)
+            {
+                ViewModel.EditNodeCommand.Execute(null);
+            }
+        };
     }
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
@@ -69,6 +77,22 @@ public partial class MainWindow : Window, IUiServices
 
         return folders.Select(f => f.TryGetLocalPath()).OfType<string>().FirstOrDefault();
     }
+
+    public async Task<string?> PickSaveFileAsync(string suggestedName)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Tags exportieren",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "csv",
+            FileTypeChoices = [new FilePickerFileType("CSV-Datei") { Patterns = ["*.csv"] }],
+        });
+
+        return file?.TryGetLocalPath();
+    }
+
+    public Task<TagDefinition?> EditNodeAsync(NodeEditorViewModel editor) =>
+        new NodeEditorWindow(editor).ShowDialog<TagDefinition?>(this);
 
     public async Task CopyToClipboardAsync(string text)
     {

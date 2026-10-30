@@ -142,6 +142,28 @@ public sealed class ImportTests : IDisposable
     }
 
     [Fact]
+    public async Task Exported_csv_imports_to_the_same_tags()
+    {
+        TagDefinition[] tags =
+        [
+            new() { Path = "A/Text", DataType = TagDataType.String, Value = " Hallo; \"Welt\" ", Access = TagAccess.Read, Description = "zwei\nZeilen" },
+            new() { Path = "A/Values", NodeId = "Custom.Id", DataType = TagDataType.Double, IsArray = true, Value = "1.5|2" },
+            new() { Path = "B/Sine", DataType = TagDataType.Float, Simulation = SimulationKind.Sine, Min = -1.25, Max = 3, Period = 10 },
+        ];
+        var path = Path.Combine(_dir, "export.csv");
+
+        await AutoOpcUaServer.Export.TagCsvWriter.WriteFileAsync(tags, path);
+        var result = Import(path);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(tags.Length, result.Tags.Count);
+        for (var i = 0; i < tags.Length; i++)
+        {
+            Assert.Equivalent(TagRowMapper.ToRow(tags[i]), TagRowMapper.ToRow(result.Tags[i]));
+        }
+    }
+
+    [Fact]
     public void Missing_file_is_reported()
     {
         var result = Import(Path.Combine(_dir, "missing.csv"));

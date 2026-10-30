@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using AutoOpcUaServer.Export;
 using AutoOpcUaServer.Gui.Services;
 using AutoOpcUaServer.Import;
 using AutoOpcUaServer.Model;
@@ -13,10 +14,13 @@ namespace AutoOpcUaServer.Gui.ViewModels;
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private const int MaxLogEntries = 2000;
+    private const char Separator = '/';
 
     private readonly SettingsStore _settingsStore;
     private readonly DispatcherTimer _refreshTimer;
     private readonly Dictionary<string, TagRowViewModel> _rowsByNodeId = new(StringComparer.Ordinal);
+    private readonly List<TagDefinition> _manualTags = [];
+    private ImportResult _import = new();
     private IReadOnlyList<TagDefinition> _tags = [];
     private ServerHost? _serverHost;
 
@@ -87,12 +91,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsStopped), nameof(StatusText), nameof(CanEditValue))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ReloadCommand), nameof(SetValueCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ReloadCommand), nameof(SetValueCommand), nameof(EditNodeCommand), nameof(DeleteNodeCommand))]
     private bool _isRunning;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ReloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ReloadCommand), nameof(AddNodeCommand), nameof(EditNodeCommand), nameof(DeleteNodeCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -108,7 +112,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditValue))]
-    [NotifyCanExecuteChangedFor(nameof(SetValueCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedIsManual))]
+    [NotifyCanExecuteChangedFor(nameof(SetValueCommand), nameof(EditNodeCommand), nameof(DeleteNodeCommand))]
     private TagRowViewModel? _selectedTag;
 
     [ObservableProperty]
@@ -125,6 +130,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public string TagsHeader => $"Tags ({Tags.Count})";
 
+    public bool HasNoTags => Tags.Count == 0;
+
+    public bool SelectedIsManual => SelectedTag?.IsManual == true;
+
     public string LogHeader => ErrorCount > 0 ? $"Meldungen ({ErrorCount} Fehler)" : "Meldungen";
 
     public string StatusText => IsBusy ? "Bitte warten…"
@@ -137,7 +146,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         get
         {
             var simulated = Tags.Count(t => t.Tag.Simulation != SimulationKind.None);
-            return $"{Files.Count} Datei(en) · {Tags.Count} Tags · {simulated} simuliert";
+            return $"{Files.Count} Datei(en) · {Tags.Count} Tags ({_manualTags.Count} manuell angelegt) · {simulated} simuliert";
         }
     }
 
@@ -214,13 +223,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             var files = Files.ToList();
-            var separator = '/';
             var result = files.Count == 0
                 ? new ImportResult()
-                : await Task.Run(() => new TagImporter(separator).Import(files));
-
-            SetTags(result.Errors.Count == 0 ? result.Tags : [], separator);
-            ErrorCount = result.Errors.Count;
+                : await Task.Run(() => new TagImporter(Separator).Import(files));
+            _import = result;
 
             foreach (var warning in result.Warnings)
             {
@@ -241,10 +247,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         : $"Import fehlgeschlagen: {result.Errors.Count} Fehler.");
             }
 
-            if (result.Errors.Count > 0)
-            {
-                SelectedTabIndex = 1;
-            }
+            ApplyTags();
         }
         finally
         {
@@ -252,25 +255,190 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>Combines imported and manually created tags, validates them and fills the table.</summary>
+    private void ApplyTags()
+    {
+        var tags = new List<TagDefinition>();
+        var errors = new List<string>();
+        if (_import.Errors.Count == 0)
+        {
+            tags.AddRange(_import.Tags);
+            tags.AddRange(_manualTags);
+            TagValidator.Validate(tags, Separator, errors, new List<string>());
+        }
+        else
+        {
+            // Keep the manual nodes visible so they can still be edited or deleted.
+            tags.AddRange(_manualTags);
+        }
+
+        foreach (var error in errors)
+        {
+            AddLog(LogKind.Error, error);
+        }
+
+        ErrorCount = _import.Errors.Count + errors.Count;
+        if (ErrorCount > 0)
+        {
+            SelectedTabIndex = 1;
+        }
+
+        SetTags(tags);
+    }
+
     private bool CanReload() => !IsRunning && !IsBusy;
 
-    private void SetTags(IReadOnlyList<TagDefinition> tags, char separator)
+    private void SetTags(IReadOnlyList<TagDefinition> tags)
     {
+        var selected = SelectedTag?.Tag;
         _tags = tags;
         Tags.Clear();
         _rowsByNodeId.Clear();
         foreach (var tag in tags)
         {
-            var row = new TagRowViewModel(tag, TagPaths.VariableNodeId(tag, separator));
+            var row = new TagRowViewModel(tag, TagPaths.VariableNodeId(tag, Separator), _manualTags.Contains(tag));
             Tags.Add(row);
-            _rowsByNodeId[row.NodeId] = row;
+            _rowsByNodeId.TryAdd(row.NodeId, row);
         }
 
         ApplyFilter();
+        SelectedTag = Tags.FirstOrDefault(t => t.Tag == selected);
         OnPropertyChanged(nameof(TagsHeader));
+        OnPropertyChanged(nameof(HasNoTags));
         OnPropertyChanged(nameof(Summary));
         StartCommand.NotifyCanExecuteChanged();
+        ExportCommand.NotifyCanExecuteChanged();
     }
+
+    // ---- Manually created nodes ------------------------------------------------------------
+
+    [RelayCommand(CanExecute = nameof(CanAddNode))]
+    private async Task AddNodeAsync()
+    {
+        if (Ui is null)
+        {
+            return;
+        }
+
+        // Prefill the folder of the selected tag – nodes are usually added next to similar ones.
+        var folder = SelectedTag is { } selected && selected.Path.LastIndexOf(Separator) is > 0 and var slash
+            ? selected.Path[..slash]
+            : null;
+
+        if (await Ui.EditNodeAsync(new NodeEditorViewModel(_tags, null, folder, Separator)) is { } tag)
+        {
+            await AddManualTagAsync(tag);
+        }
+    }
+
+    private bool CanAddNode() => !IsBusy;
+
+    /// <summary>
+    /// Adds a manually created node. While the server runs, the node is added to the live address
+    /// space immediately. Returns an error message if it could not be added.
+    /// </summary>
+    public async Task<string?> AddManualTagAsync(TagDefinition tag)
+    {
+        if (IsRunning && _serverHost?.Server?.TagNodeManager is { } nodeManager)
+        {
+            var error = await nodeManager.AddTagAsync(tag);
+            if (error is not null)
+            {
+                AddLog(LogKind.Error, error);
+                SelectedTabIndex = 1;
+                return error;
+            }
+
+            _manualTags.Add(tag);
+            SetTags([.. _tags, tag]);
+            RefreshValues();
+            AddLog(LogKind.Info, $"Node {tag.Path} angelegt und im laufenden Server verfügbar.");
+        }
+        else
+        {
+            _manualTags.Add(tag);
+            ApplyTags();
+            AddLog(LogKind.Info, $"Node {tag.Path} angelegt.");
+        }
+
+        SelectedTag = Tags.FirstOrDefault(t => t.Tag == tag);
+        SaveSettings();
+        return null;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanChangeNode))]
+    private async Task EditNodeAsync()
+    {
+        if (Ui is null || SelectedTag is not { IsManual: true } row)
+        {
+            return;
+        }
+
+        var others = _tags.Where(t => t != row.Tag).ToList();
+        if (await Ui.EditNodeAsync(new NodeEditorViewModel(others, row.Tag, null, Separator)) is { } tag)
+        {
+            ReplaceManualTag(row.Tag, tag);
+        }
+    }
+
+    public void ReplaceManualTag(TagDefinition existing, TagDefinition updated)
+    {
+        var index = _manualTags.IndexOf(existing);
+        if (index < 0)
+        {
+            return;
+        }
+
+        _manualTags[index] = updated;
+        ApplyTags();
+        SelectedTag = Tags.FirstOrDefault(t => t.Tag == updated);
+        AddLog(LogKind.Info, $"Node {updated.Path} geändert.");
+        SaveSettings();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanChangeNode))]
+    public void DeleteNode()
+    {
+        if (SelectedTag is not { IsManual: true } row)
+        {
+            return;
+        }
+
+        _manualTags.Remove(row.Tag);
+        ApplyTags();
+        AddLog(LogKind.Info, $"Node {row.Path} gelöscht.");
+        SaveSettings();
+    }
+
+    // Changing or removing nodes of a running server would disconnect clients' monitored items,
+    // so it is only possible while the server is stopped.
+    private bool CanChangeNode() => !IsRunning && !IsBusy && SelectedTag?.IsManual == true;
+
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private async Task ExportAsync()
+    {
+        if (Ui is not null && await Ui.PickSaveFileAsync("tags.csv") is { } path)
+        {
+            await ExportToAsync(path);
+        }
+    }
+
+    /// <summary>Saves all tags (imported and manual) as CSV that both the GUI and the console can import.</summary>
+    public async Task ExportToAsync(string path)
+    {
+        try
+        {
+            await TagCsvWriter.WriteFileAsync(_tags, path);
+            AddLog(LogKind.Info, $"{_tags.Count} Tags exportiert nach {path}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AddLog(LogKind.Error, $"Export fehlgeschlagen: {ex.Message}");
+            SelectedTabIndex = 1;
+        }
+    }
+
+    private bool CanExport() => _tags.Count > 0;
 
     private void ApplyFilter()
     {
@@ -324,7 +492,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _refreshTimer.Start();
     }
 
-    private bool CanStart() => !IsRunning && !IsBusy && ErrorCount == 0 && Files.Count > 0;
+    private bool CanStart() => !IsRunning && !IsBusy && ErrorCount == 0 && _tags.Count > 0;
 
     [RelayCommand(CanExecute = nameof(CanStop))]
     public async Task StopAsync()
@@ -465,6 +633,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
         AllowAnonymous = settings.AllowAnonymous;
         AutoAccept = settings.AutoAcceptUntrustedCertificates;
         SimulationInterval = settings.SimulationIntervalMs;
+
+        var mapper = new TagRowMapper(Separator);
+        var errors = new List<string>();
+        foreach (var row in settings.ManualTags)
+        {
+            if (mapper.Map(row, NodeEditorViewModel.ManualSource, errors) is { } tag)
+            {
+                _manualTags.Add(tag);
+            }
+        }
+
+        foreach (var error in errors)
+        {
+            AddLog(LogKind.Error, $"Gespeicherter Node ungültig: {error}");
+        }
     }
 
     public void SaveSettings() => _settingsStore.Save(new GuiSettings
@@ -481,6 +664,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         AllowAnonymous = AllowAnonymous,
         AutoAcceptUntrustedCertificates = AutoAccept,
         SimulationIntervalMs = (int)(SimulationInterval ?? 1000),
+        ManualTags = _manualTags.Select(TagRowMapper.ToRow).ToList(),
     });
 
     private void AddLog(LogKind kind, string message)

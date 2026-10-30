@@ -6,10 +6,11 @@ namespace AutoOpcUaServer.Gui.ViewModels;
 /// <summary>One row of the tag table.</summary>
 public sealed partial class TagRowViewModel : ObservableObject
 {
-    public TagRowViewModel(TagDefinition tag, string nodeId)
+    public TagRowViewModel(TagDefinition tag, string nodeId, bool isManual = false)
     {
         Tag = tag;
         NodeId = nodeId;
+        IsManual = isManual;
         DataType = tag.DataType + (tag.IsArray ? "[]" : "");
         Access = tag.Access == TagAccess.ReadWrite ? "RW" : "R";
         Simulation = tag.Simulation == SimulationKind.None ? "" : tag.Simulation.ToString();
@@ -17,6 +18,9 @@ public sealed partial class TagRowViewModel : ObservableObject
     }
 
     public TagDefinition Tag { get; }
+
+    /// <summary>Created in the GUI rather than imported from a file; only these can be edited.</summary>
+    public bool IsManual { get; }
 
     public string Path => Tag.Path;
 

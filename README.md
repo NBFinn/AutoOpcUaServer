@@ -27,6 +27,21 @@ dotnet run --project src/AutoOpcUaServer.Gui
    Einen Tag auswählen, um seinen Wert unten **manuell zu setzen** – auch bei Read-only-Tags, z. B. um eine SPS zu simulieren.
 5. Schreibzugriffe von Clients und Warnungen des OPC-UA-Stacks werden unter **Meldungen** protokolliert.
 
+### Nodes selbst anlegen
+
+Statt (oder zusätzlich zu) einer Tagliste lassen sich Variablen direkt in der Oberfläche anlegen: **+ Node anlegen** öffnet einen Dialog
+mit Pfad (fehlende Ordner werden automatisch erzeugt), Datentyp, Array, Startwert, Zugriff, Beschreibung, Simulation (Min/Max/Periode)
+und optional einer eigenen NodeId. Eingaben werden sofort gegen alle vorhandenen Nodes geprüft (doppelter Pfad, ungültiger Wert, …).
+
+![Node anlegen](docs/node-editor.png)
+
+- **Während der Server läuft** wird ein neuer Node sofort im Adressraum angelegt – verbundene Clients sehen ihn ohne Neustart.
+- **Bearbeiten** (auch per Doppelklick) und **Löschen** gibt es für selbst angelegte Nodes, solange der Server gestoppt ist.
+  Importierte Tags ändert man in ihrer Datei; die Spalte **Quelle** zeigt, woher ein Tag stammt.
+- Selbst angelegte Nodes werden mit den Einstellungen gespeichert und sind beim nächsten Start wieder da.
+- **Exportieren…** speichert alle Tags (importierte und eigene) als CSV – die Datei lässt sich wieder importieren,
+  auch in der Kommandozeilen-Version.
+
 Dateiliste und Einstellungen (außer dem Passwort) werden gespeichert und beim nächsten Start wiederhergestellt
 (`%APPDATA%\AutoOpcUaServer` bzw. `~/.config/AutoOpcUaServer`). Dort liegen auch die Zertifikate der GUI (`pki/`).
 Dateien können auch beim Start übergeben werden: `AutoOpcUaServer.Gui.exe tags.xlsx`.
@@ -218,5 +233,5 @@ samples/                        Beispiel-Taglisten
 Screenshot für die README neu erzeugen:
 
 ```bash
-GUI_SCREENSHOT=$PWD/docs/screenshot.png dotnet test tests/AutoOpcUaServer.Gui.Tests --filter Main_window_renders
+GUI_SCREENSHOT=$PWD/docs/screenshot.png GUI_SCREENSHOT_EDITOR=$PWD/docs/node-editor.png dotnet test tests/AutoOpcUaServer.Gui.Tests --filter "Main_window_renders|Editor_window_renders"
 ```

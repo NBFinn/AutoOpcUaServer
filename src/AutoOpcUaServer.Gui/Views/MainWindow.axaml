@@ -117,7 +117,19 @@
       <TabControl Grid.Column="2" Margin="8,4,8,8" SelectedIndex="{Binding SelectedTabIndex}">
         <TabItem Header="{Binding TagsHeader}">
           <DockPanel Margin="0,8,0,0">
-            <TextBox DockPanel.Dock="Top" Text="{Binding Filter}" Watermark="Filtern nach Pfad, NodeId, Typ oder Beschreibung…" Margin="0,0,0,8" />
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" Margin="8,0,0,0">
+                <Button Classes="accent" Content="+  Node anlegen" Command="{Binding AddNodeCommand}"
+                        ToolTip.Tip="Eigene Variable anlegen – auch während der Server läuft" />
+                <Button Content="Bearbeiten" Command="{Binding EditNodeCommand}"
+                        ToolTip.Tip="Nur selbst angelegte Nodes, bei gestopptem Server (Doppelklick auf die Zeile)" />
+                <Button Content="Löschen" Command="{Binding DeleteNodeCommand}"
+                        ToolTip.Tip="Nur selbst angelegte Nodes, bei gestopptem Server" />
+                <Button Content="Exportieren…" Command="{Binding ExportCommand}"
+                        ToolTip.Tip="Alle Tags als CSV speichern – wieder importierbar in GUI und Konsole" />
+              </StackPanel>
+              <TextBox Text="{Binding Filter}" Watermark="Filtern nach Pfad, NodeId, Typ oder Beschreibung…" />
+            </DockPanel>
 
             <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,8,0,0" Padding="10,8" IsVisible="{Binding CanEditValue}">
               <DockPanel>
@@ -131,20 +143,34 @@
               </DockPanel>
             </Border>
 
-            <DataGrid ItemsSource="{Binding VisibleTags}" SelectedItem="{Binding SelectedTag}"
+            <Panel>
+            <DataGrid x:Name="TagGrid" ItemsSource="{Binding VisibleTags}" SelectedItem="{Binding SelectedTag}"
                       IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="True" CanUserSortColumns="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="Pfad" Binding="{Binding Path}" x:DataType="vm:TagRowViewModel" Width="2*" />
-                <DataGridTextColumn Header="Wert" Binding="{Binding Value}" x:DataType="vm:TagRowViewModel" Width="*" FontWeight="SemiBold" />
-                <DataGridTextColumn Header="Typ" Binding="{Binding DataType}" x:DataType="vm:TagRowViewModel" Width="Auto" />
-                <DataGridTextColumn Header="Zugriff" Binding="{Binding Access}" x:DataType="vm:TagRowViewModel" Width="Auto" />
-                <DataGridTextColumn Header="Simulation" Binding="{Binding Simulation}" x:DataType="vm:TagRowViewModel" Width="Auto" />
-                <DataGridTextColumn Header="Zeitstempel" Binding="{Binding Timestamp}" x:DataType="vm:TagRowViewModel" Width="Auto" />
-                <DataGridTextColumn Header="NodeId" Binding="{Binding NodeId}" x:DataType="vm:TagRowViewModel" Width="1.5*" />
-                <DataGridTextColumn Header="Beschreibung" Binding="{Binding Description}" x:DataType="vm:TagRowViewModel" Width="1.5*" />
+                <DataGridTextColumn Header="Pfad" Binding="{Binding Path}" x:DataType="vm:TagRowViewModel" Width="230" />
+                <DataGridTextColumn Header="Wert" Binding="{Binding Value}" x:DataType="vm:TagRowViewModel" Width="120" FontWeight="SemiBold" />
+                <DataGridTextColumn Header="Typ" Binding="{Binding DataType}" x:DataType="vm:TagRowViewModel" Width="85" />
+                <DataGridTextColumn Header="Zugriff" Binding="{Binding Access}" x:DataType="vm:TagRowViewModel" Width="85" />
+                <DataGridTextColumn Header="Simulation" Binding="{Binding Simulation}" x:DataType="vm:TagRowViewModel" Width="115" />
+                <DataGridTextColumn Header="Quelle" Binding="{Binding Source}" x:DataType="vm:TagRowViewModel" Width="90" />
+                <DataGridTextColumn Header="Zeitstempel" Binding="{Binding Timestamp}" x:DataType="vm:TagRowViewModel" Width="125" />
+                <DataGridTextColumn Header="NodeId" Binding="{Binding NodeId}" x:DataType="vm:TagRowViewModel" Width="220" />
+                <DataGridTextColumn Header="Beschreibung" Binding="{Binding Description}" x:DataType="vm:TagRowViewModel" Width="260" />
               </DataGrid.Columns>
             </DataGrid>
+
+            <!-- Empty state -->
+            <StackPanel IsVisible="{Binding HasNoTags}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+              <TextBlock Text="Noch keine Nodes" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <TextBlock Classes="hint" TextAlignment="Center" FontSize="14"
+                         Text="Importiere eine Tagliste (CSV, Excel, JSON) oder lege Nodes direkt hier an. Danach kannst du den Server starten." />
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                <Button Content="Dateien hinzufügen…" Command="{Binding AddFilesCommand}" />
+                <Button Classes="accent" Content="+  Node anlegen" Command="{Binding AddNodeCommand}" />
+              </StackPanel>
+            </StackPanel>
+            </Panel>
           </DockPanel>
         </TabItem>
 

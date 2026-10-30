@@ -1,3 +1,4 @@
+using System.Globalization;
 using AutoOpcUaServer.Model;
 
 namespace AutoOpcUaServer.Import;
@@ -36,6 +37,36 @@ public sealed class TagRowMapper
     {
         var key = new string(header.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
         return ColumnAliases.TryGetValue(key, out var canonical) ? canonical : null;
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="Map"/>: the row (canonical column → text) that describes <paramref name="tag"/>.
+    /// Empty columns are left out.
+    /// </summary>
+    public static Dictionary<string, string?> ToRow(TagDefinition tag)
+    {
+        static string? Number(double? value) => value?.ToString("R", CultureInfo.InvariantCulture);
+
+        var row = new Dictionary<string, string?>
+        {
+            ["path"] = tag.Path,
+            ["nodeid"] = tag.NodeId,
+            ["datatype"] = tag.DataType + (tag.IsArray ? "[]" : ""),
+            ["value"] = tag.Value,
+            ["access"] = tag.Access == TagAccess.ReadWrite ? "RW" : "R",
+            ["description"] = tag.Description,
+            ["simulation"] = tag.Simulation == SimulationKind.None ? null : tag.Simulation.ToString(),
+            ["min"] = Number(tag.Min),
+            ["max"] = Number(tag.Max),
+            ["period"] = Number(tag.Period),
+        };
+
+        foreach (var key in row.Where(r => string.IsNullOrEmpty(r.Value)).Select(r => r.Key).ToList())
+        {
+            row.Remove(key);
+        }
+
+        return row;
     }
 
     /// <summary>

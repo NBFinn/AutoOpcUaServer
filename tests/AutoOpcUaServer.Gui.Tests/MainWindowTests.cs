@@ -133,6 +133,10 @@ public sealed class MainWindowTests : IDisposable
     {
         var vm = CreateViewModel();
         await vm.AddPathsAsync([WriteCsv(Csv)]);
+        await vm.AddManualTagAsync(new Model.TagDefinition
+        {
+            Path = "Plant/Line2/Alarm", DataType = Model.TagDataType.Boolean, Description = "Störmeldung", Source = "Manuell",
+        });
         await vm.StartAsync();
         try
         {
